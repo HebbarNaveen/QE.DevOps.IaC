@@ -1,0 +1,44 @@
+parameters:
+- name: withMutationTesting
+  type: boolean
+  default: false
+
+- name: withPlaywright
+  type: boolean
+  default: false
+
+variables:
+    isMainBranch: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
+    isPullRequest: ${{ eq(variables['Build.Reason'], 'PullRequest') }}
+
+stages:
+- stage: BuildTestPack
+  displayName: 'BUILD | TEST | PACK'
+  jobs:
+    - template: build-test-pack.yaml@templates
+      parameters:
+        withPlaywright: ${{ parameters.withPlaywright }}
+
+- ${{ if and(eq(variables.isPullRequest, true), eq(parameters.withMutationTesting, true)) }}:
+  - template: mutation-testing.yaml
+
+- ${{ if and(eq(variables.isPullRequest, false), eq(variables.isMainBranch, false)) }}:
+  - template: release-package.yaml@templates
+    parameters:
+      repoPath: 'qualityengineering-nuget-dev-london'
+      environment: 'dotnet dev-artifactory'
+      stageName: 'DEV'
+
+- ${{ if and(eq(variables.isPullRequest, false), eq(variables.isMainBranch, true)) }}:
+  - template: release-package.yaml@templates
+    parameters:
+      repoPath: 'qualityengineering-nuget-staging-london'
+      environment: 'dotnet staging-artifactory'
+      stageName: 'STAGING'
+
+- ${{ if and(eq(variables.isPullRequest, false), eq(variables.isMainBranch, true)) }}:
+  - template: release-package.yaml@templates
+    parameters:
+      repoPath: 'qualityengineering-nuget-release-london'
+      environment: 'dotnet release-artifactory'
+      stageName: 'RELEASE'

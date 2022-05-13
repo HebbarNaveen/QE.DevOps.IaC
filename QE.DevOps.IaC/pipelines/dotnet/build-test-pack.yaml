@@ -1,0 +1,92 @@
+parameters:
+- name: configuration
+  default: 'Release'
+
+- name: withPlaywright
+  type: boolean
+  default: false
+
+jobs:
+  - job: 'Build_Test_Pack'
+    displayName: 'Build-Test-Pack Libraries'
+    pool: LON-PROD-NetCore
+    workspace:
+       clean: all
+
+    steps:
+    - checkout: self
+      path: code
+
+    - task: gitversion/setup@0
+      inputs:
+        versionSpec: '5.x'
+
+    - task: gitversion/execute@0
+      inputs:
+        useConfigFile: true
+        configFilePath: '$(Agent.BuildDirectory)/code/GitVersion.yml'
+
+    - task: PowerShell@2
+      displayName: "log variables"
+      inputs:
+        targetType: 'inline'
+        script: |
+          Write-Host "GitVersion.SemVer: " $(GitVersion.SemVer)
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet restore'
+      inputs:
+        command: 'restore'
+        projects: '$(Agent.BuildDirectory)/code/**/*.csproj'
+        feedsToUse: 'config'
+        nugetConfigPath: 'nuget.config'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet build'
+      inputs:
+        command: 'build'
+        projects: '$(Agent.BuildDirectory)/code/**/*.csproj'
+        arguments: '-c ${{ parameters.configuration }} --no-restore'
+
+    - task: CmdLine@2
+      displayName: 'install playwright'
+      inputs:
+        script: |
+          dotnet new tool-manifest --force
+          dotnet tool install Microsoft.Playwright.CLI
+          dotnet playwright install
+      condition: ${{ parameters.withPlaywright }}
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet test'
+      inputs:
+        command: 'test'
+        projects: '$(Agent.BuildDirectory)/code/tests/**/*Tests.csproj'
+        testRunTitle: 'Run Unit Tests'
+        arguments: '--collect:"XPlat Code Coverage" --no-build -c ${{ parameters.configuration }}'
+
+    - task: reportgenerator@4
+      inputs:
+        reports: '$(Agent.TempDirectory)/**/coverage.cobertura.xml'
+        targetdir: '$(Build.ArtifactStagingDirectory)/Coverage'
+        reporttypes: 'cobertura'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet pack'
+      inputs:
+        command: 'pack'
+        packagesToPack: '$(Agent.BuildDirectory)/code/src/**/*.csproj'
+        nobuild: true
+        versioningScheme: 'byEnvVar'
+        versionEnvVar: 'GitVersion.SemVer'
+        packDirectory: '$(Build.ArtifactStagingDirectory)/packages'
+        configuration: '${{ parameters.configuration }}'
+
+    - task: PublishCodeCoverageResults@1
+      displayName: 'publish code coverage'
+      inputs:
+        codeCoverageTool: Cobertura
+        summaryFileLocation: '$(Build.ArtifactStagingDirectory)/Coverage/Cobertura.xml'
+
+    - publish: $(Build.ArtifactStagingDirectory)/packages
+      artifact: packages

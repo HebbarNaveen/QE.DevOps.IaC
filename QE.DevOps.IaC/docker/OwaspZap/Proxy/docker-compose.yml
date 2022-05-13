@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  zaproxy:
+    image: owasp/zap2docker-stable
+    user: zap
+    ports:
+    - "8080:8080"
+    volumes:
+    - .:/zap/wrk/:rw
+    command: ${PROXY_MODE:-zap}.sh -host 0.0.0.0 -port 8080 -config api.addrs.addr.name=.* -config api.addrs.addr.regex=true -last_scan_report /zap/wrk/security-report.html -newsession /zap/wrk/new -cmd ${OPTIONS}

@@ -1,0 +1,61 @@
+parameters:
+- name: configuration
+  default: 'Release'
+- name: repoPath
+  default: 'qualityengineering-nuget-dev-london'
+- name: environment
+  default: 'dotnet dev-artifactory'
+- name: stageName
+  default: 'DEV'
+
+stages:
+- stage: ${{ parameters.stageName }}
+  pool: LON-PROD-NetCore
+  variables:
+      GitVersion.SemVer: ''
+
+  jobs:
+  - deployment: 'PushPackage'
+    displayName: 'Push Package'
+    environment: ${{ parameters.environment }}
+    workspace:
+      clean: all
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+
+          - download: current
+            artifact: packages
+
+          - task: PowerShell@2
+            displayName: "log variables"
+            inputs:
+              targetType: 'inline'
+              script: |
+                Write-Host "repoPath: " ${{ parameters.repoPath }}
+
+          - task: ArtifactoryToolsInstaller@1
+            displayName: 'install artifactory tools'
+            inputs:
+              artifactoryService: 'Schroders - Artifactory - PRD'
+              cliInstallationRepo: 'gen-jfrogcli-remote'
+
+          - task: ArtifactoryNuGet@2
+            displayName: 'push packages to artifactory'
+            inputs:
+              command: 'push'
+              artifactoryService: 'Schroders - Artifactory - PRD'
+              targetDeployRepo: '${{ parameters.repoPath }}'
+              pathToNupkg: '$(Pipeline.Workspace)/packages/*.nupkg'
+              collectBuildInfo: true
+              buildName: '$(Build.DefinitionName)'
+              buildNumber: '$(Build.BuildNumber)'
+              includeEnvVars: true
+
+          - task: ArtifactoryPublishBuildInfo@1
+            displayName: "publish build info to artifactory"
+            inputs:
+              artifactoryService: 'Schroders - Artifactory - PRD'
+              buildName: '$(Build.DefinitionName)'
+              buildNumber: '$(Build.BuildNumber)'

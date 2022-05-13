@@ -1,0 +1,8 @@
+version: "3.9"
+services:
+  taurus:
+    image: blazemeter/taurus
+    volumes:
+    - /bzt-configs:/bzt-configs
+    - /tmp/artifacts:/tmp/artifacts
+    command: ${TAURUS_CONFIG}

@@ -1,0 +1,46 @@
+stages:
+- stage: 'Mutation_Testing'
+  displayName: 'MUTATION TESTING'
+  pool: LON-PROD-NetCore
+
+  jobs:
+  - job: 'Mutation_Testing'
+    displayName: 'Mutation Testing'
+    pool: LON-PROD-NetCore
+    workspace:
+       clean: all
+
+    steps:
+    - checkout: self
+      path: code
+
+    - task: DotNetCoreCLI@2
+      displayName: 'dotnet restore'
+      inputs:
+        command: 'restore'
+        projects: '$(Agent.BuildDirectory)/code/**/*.csproj'
+        feedsToUse: 'config'
+        nugetConfigPath: 'nuget.config'
+
+    - task: CmdLine@2
+      displayName: 'install stryker tool'
+      inputs:
+        script: |
+          dotnet new tool-manifest
+      
+          dotnet tool install dotnet-stryker
+        workingDirectory: '$(Agent.BuildDirectory)/code'
+
+    - task: CmdLine@2
+      displayName: 'run mutation testing'
+      inputs:
+        script: |
+          cd tests/*.Tests
+          dotnet stryker -f $(Agent.BuildDirectory)/code/tests/stryker-config.json -L
+        workingDirectory: '$(Agent.BuildDirectory)/code'
+
+    - task: PublishMutationReport@0
+      displayName: 'publish mutation testing report'
+      condition: succeededOrFailed()
+      inputs:
+        reportPattern: '$(Agent.BuildDirectory)/code/tests/*.Tests/**/mutation-report.html'

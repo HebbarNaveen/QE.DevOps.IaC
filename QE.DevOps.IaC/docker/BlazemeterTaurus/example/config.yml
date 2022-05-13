@@ -1,0 +1,49 @@
+execution:
+- scenario: jmeter
+  concurency: 5
+  ramp-up: 30
+  hold-for: 15
+- scenario: nunit-selenium
+  executor: selenium
+  concurrency: 4
+  iterations: 5
+  ramp-up: 1m
+- scenario: nunit
+  executor: nunit
+  concurrency: 10
+  iterations: 20
+
+scenarios:
+  jmeter: 
+    script: /script/path
+    modifications:
+    set-prop:
+      "Http Request Defaults>HttpSampler.domain": "www.schroders.com" # We overwrite base url of test suite
+  nunit-selenium:
+    script: /script2/path
+  nunit:
+    script: /script3/path
+
+reporting:
+- module: final-stats
+  summary: true  # overall samples count and percent of failures
+  percentiles: true  # display average times and percentiles
+  summary-labels: false # provides list of sample labels, status, percentage of completed, avg time and errors
+  failed-labels: false  # provides list of sample labels with failures
+  test-duration: true  # provides test duration
+  dump-xml: filename to export data in XML format
+  dump-csv: filename to export data in CSV format
+- module: junit-xml
+  filename: /path_to_file/file.xml
+
+modules:
+  local: 
+    sequential: true # Added because nunit executor crashes when trying to run more than one assembly at a time
+  selenium:
+    chromedriver:
+      version: 91.0.4472.19
+      download-link: https://chromedriver.storage.googleapis.com/{version}/chromedriver_{arch}.zip
+  jmeter:
+    download-link: https://archive.apache.org/dist/jmeter/binaries/apache-jmeter-{version}.zip
+    version: 5.4.1
+    force-ctg: true

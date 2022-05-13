@@ -1,0 +1,7 @@
+version: "3.9"
+services:
+  zaproxy:
+    image: owasp/zap2docker-stable
+    volumes:
+    - .:/zap/wrk/:rw
+    command: zap-${SCAN_TYPE:-baseline}.py -t ${TARGET} -r security-scan-report.html ${FORMAT} ${OPTIONS}
